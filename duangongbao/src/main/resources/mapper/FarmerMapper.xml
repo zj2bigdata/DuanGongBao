@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yy.duangongbao.dao.FarmerMapper" >
+  <select id="showProject" resultType="map">
+  	select * from project where flag = '2'
+  </select>
+  
+  <select id="showOrders" resultType="map">s
+  	select projectid,ordername,starttime,endtime from orderinfo 
+  </select>
+</mapper>

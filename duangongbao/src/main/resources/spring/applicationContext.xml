@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:util="http://www.springframework.org/schema/util"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop 
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/util 
+		http://www.springframework.org/schema/util/spring-util.xsd
+		http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx.xsd">
+        
+    <context:component-scan base-package="com.yy.duangongbao.service"/>
+    
+    <util:properties id="jdbc" location="classpath:config/db.properties"/>
+    
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+	    <property name="driverClassName" value="#{jdbc.driver}" />
+	    <property name="url" value="#{jdbc.url}" />
+	    <property name="username" value="#{jdbc.username}" />
+	    <property name="password" value="#{jdbc.password}" />
+	    <!-- 从数据源中返回的连接是否采用自动提交机制 -->
+	    <property name="defaultAutoCommit" value="true" />
+	    <!-- 是否仅能执行只读操作 -->
+	    <property name="defaultReadOnly" value="false" />
+	    <!-- 初始化数据库连接数 -->
+	    <property name="initialSize" value="0" />
+	        <!-- 最大连接数据库连接数，设置为0时，表示没有限制 -->
+	    <property name="maxActive" value="10" />
+	    <!-- 最大等待连接中的数量，设置为0时，表示没有限制 -->
+	    <property name="maxIdle" value="1" />
+	    <!-- 最大等待秒数，单位为毫秒 -->
+	    <property name="maxWait" value="6000" />
+	    <property name="testWhileIdle" value="true"/>
+	    <property name="timeBetweenEvictionRunsMillis" value="60000" />
+	    <property name="numTestsPerEvictionRun" value="1" />
+	    <property name="validationQuery" value="select 1" />
+    </bean>
+    
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    	<property name="dataSource" ref="dataSource" />
+		<property name="typeAliasesPackage" value="com.yy.duangongbao.pojo"/>
+    	<property name="configLocation" value="classpath:mybatis/MyBatis.xml"/>
+    	<property name="mapperLocations" value="classpath:mapper/*.xml"/>
+	</bean>
+	
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+	    <property name="basePackage" value="com.yy.duangongbao.dao"/>
+	</bean>
+	<!-- 1.配置事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">  
+        <property name="dataSource" ref="dataSource" />  
+	</bean>
+	<!-- 2.启用事务注解，事务一般配置在业务层 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+	
+	
+	<!-- 配置自定义Realm -->
+    <bean id="loginRealm" class="com.yy.duangongbao.shiro.LoginRealm"/>
+    <!-- 安全管理器 -->
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="realm" ref="loginRealm"/>
+    </bean>
+    <!-- Shiro过滤器 核心-->
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <!-- Shiro的核心安全接口,这个属性是必须的 -->
+        <property name="securityManager" ref="securityManager"/>
+        <!-- 身份认证失败，则跳转到登录页面的配置 -->
+        <property name="loginUrl" value="/index.jsp"/>
+        <!-- 权限认证失败，则跳转到指定页面 -->
+        <property name="unauthorizedUrl" value="/power.jsp"/>
+        <!-- Shiro连接约束配置,即过滤链的定义 -->
+        <property name="filterChainDefinitions">
+            <value>
+                <!--anon 表示匿名访问，不需要认证以及授权-->
+                /index=anon
+                /login.do=anon
+                /register.do=anon
+				/toPage.do=authc
+				/worker*=roles[工人,2]
+				/famer*=roles[农户,2]
+				/admin*=roles[管理员,2]
+				/foreman*=roles[工头,2]
+				/projectAndOrder.jsp=roles[管理员,2]
+				/user.jsp=roles[管理员,2]
+                <!--authc表示需要认证 没有进行身份认证是不能进行访问的
+                /admin*=authc
+                /student=roles[teacher]
+                /teacher=perms["user:create"] -->
+            </value>
+        </property>
+    </bean>
+    <!-- 保证实现了Shiro内部lifecycle函数的bean执行 -->
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+    <!-- 开启Shiro注解 -->
+    <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator"
+          depends-on="lifecycleBeanPostProcessor"/>
+    <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+        <property name="securityManager" ref="securityManager"/>
+    </bean>
+
+</beans>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.yy.duangongbao.dao.PersonMapper">
+    <!-- 登录与注册页面专用SQL -->
+    <select id="selectSinglePersonByAccount" resultType="map" parameterType="string">
+        select * 
+        from person 
+        where person_account=#{arg0}
+    </select>
+    <insert id="insertSinglePerson" parameterType="map">
+        insert into 
+        person 
+        values(#{person_id},#{person_name},#{person_account},#{person_pwd},#{person_type},#{person_flag},#{person_address},#{person_foremanId});
+    </insert>
+    <select id="selectSinglePower" parameterType="string" resultType="string">
+        select url from 
+        resource re INNER JOIN roleresource rr on re.id=rr.resource_id 
+        INNER JOIN role r ON rr.role_id=r.id 
+        WHERE r.role_name=#{arg0}
+    </select>
+    <select id="selectForemans" parameterType="string" resultType="map">
+    	select * from person where person_type='工头'
+    </select>
+    <update id="updateMyForeman" parameterType="string">
+    	update person set person_foremanId=#{param1} where person_id=#{param2}
+    </update>
+    <!-- 工人页面SQL -->
+    <select id="selectSingleWorkerOrderByPid" resultType="map" parameterType="string">
+       select o.* 
+        from orderinfo o 
+        inner join personorder po on o.id=po.order_id 
+        inner join person p on po.person_id=p.person_id
+        where p.person_id=#{arg0}
+    </select>
+    
+    <!-- 查询所有未加入公会的工人 -->
+    <select id="queryAllWorker" resultType="map">
+        select * from person p LEFT JOIN
+		(select * from invite
+    	where person_foremanid = #{person_foremanId}) i
+		on p.person_id=i.person_id
+		where p.person_type = "工人" 		
+		and p.person_foremanId = " "
+		and i.person_id is null
+    </select>
+    <!-- 查询工头的下属工人 -->
+    <select id="queryWorkerByForemanid" resultType="map">
+        select * from person 
+        where person_foremanId = #{person_foremanId}
+    </select>
+    <!-- 工头邀请工人 -->
+    <insert id="invite">
+    	insert into invite 
+    	values (#{id},#{person_id},#{person_foremanId})
+    </insert>
+    <!-- 工头删除下属工人 -->
+    <update id="deleteWorkerByForeman">
+    	UPDATE person
+        SET person_foremanid = " "
+        WHERE person_id = #{person_id}
+    </update>
+    <!-- 工头查询可接的订单 -->
+    <select id="queryAllOrder" resultType="map">
+        select * ,(select count(*) from personorder o INNER JOIN person p on o.person_id=p.person_id 
+		where p.person_foremanId !=" " or p.person_foremanId is not null GROUP BY o.order_id) as realnum        
+        from orderinfo
+		where unix_timestamp(NOW()) between unix_timestamp(starttime) and least(unix_timestamp(endtime),unix_timestamp(realendtime))
+		or realendtime is null
+		and personnumber>(select count(*) from personorder o INNER JOIN person p on o.person_id=p.person_id where p.person_foremanId !=" ")
+		and id != (select order_id from personorder where person_Id=#{foremanId})
+		or (select order_id from personorder where person_Id=#{foremanId}) is null		
+    </select>
+    <select id="queryRealNumber" resultType="String">
+    	select count(*) from personorder o INNER JOIN person p on o.person_id=p.person_id 
+		where p.person_foremanId !=" "
+    </select>
+     <!-- 工头接单 -->
+    <insert id="addPersonOrder">
+    	insert into personorder values (#{id},#{person_id},#{order_id})
+    </insert>
+    <!-- 工头已接的订单 -->
+    <select id="queryOrderCountByForemanid" resultType="string">
+       select count(1) from orderinfo o INNER JOIN personorder p on o.id=p.order_id
+		where person_id=#{foremanId}
+    </select>
+    <select id="queryOrderByForemanid" resultType="map">
+       select *,(select count(*) from personorder o INNER JOIN person p on o.person_id=p.person_id 
+		where p.person_foremanId !=" " or p.person_foremanId is not null GROUP BY o.order_id) as realnum 
+		from orderinfo o INNER JOIN personorder p on o.id=p.order_id
+		where person_id=#{foremanId}
+    </select>
+     <!-- 工头给工人分配任务 -->
+    <select id="queryWorkerPersonOrder" resultType="map">
+    	select * from person p left join personorder o on p.person_id=o.person_id
+        where person_foremanId = #{person_foremanId}
+		and o.person_id is null
+    </select>
+    <insert id="addPersonOrderWorker">
+    	insert into personorder 
+    	values (#{id},#{person_id},#{order_id})
+    </insert>
+    
+    <select id="showProject" resultType="map">
+  	select * from project where flag = '2'
+  </select>
+  
+  <select id="showOrders" resultType="map">s
+  	select projectid,ordername,starttime,endtime from orderinfo 
+  </select>
+  
+  <select id="queryAllUser" resultType="map">
+        SELECT *
+        FROM person
+        WHERE person_type NOT IN ('管理员')
+    </select>
+    <select id="querySingleByRole" resultType="map" parameterType="string">
+        SELECT *
+        FROM person
+        WHERE person_type = #{role,jdbcType=VARCHAR}
+    </select>
+    <select id="querySingleByState" resultType="map">
+        SELECT *
+        FROM person
+        WHERE person_flag = #{state}
+              AND
+              person_type NOT IN ('管理员')
+    </select>
+    <update id="isChecked">
+        UPDATE person
+        SET person_flag = '2'
+        WHERE person_account = #{account}
+              AND
+              person_type NOT IN ('管理员')
+    </update>
+    <update id="pwdChanged">
+        UPDATE person
+        SET person_pwd = #{pwd}
+        WHERE person_name = #{account}
+              AND
+              person_type NOT IN ('管理员')
+    </update>
+
+    <select id="queryUserByVagueName" resultType="map">
+        SELECT *
+        FROM person
+        WHERE person_name LIKE #{name}
+              AND
+              person_type NOT IN ('管理员')
+    </select>
+</mapper>
